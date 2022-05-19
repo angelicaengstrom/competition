@@ -12,13 +12,25 @@
 
 template<typename T>
 void get_result(std::vector<T> result, const std::string& filename = "result.txt"){
-    std::ofstream out(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
+    std::ofstream out(R"(C:\Users\angel\OneDrive\Dokument\Skola\Data\sortcomp\text\)" + filename);
     out.precision(7); //Gör att vi skriver ut två decimaltal
     for(int i = 0; i < result.size(); i++){
         if(i % 10 == 0 && i){
             out << "\n";
         }
         out << result[i] << " ";
+    }
+}
+
+template<>
+void get_result<price_t>(std::vector<price_t> result, const std::string& filename){
+    std::ofstream out(R"(C:\Users\angel\OneDrive\Dokument\Skola\Data\sortcomp\text\)" + filename);
+    out.precision(7); //Gör att vi skriver ut två decimaltal
+    for(int i = 0; i < result.size(); i++){
+        if(i % 10 == 0 && i){
+            out << "\n";
+        }
+        out << result[i] << " kr  ";
     }
 }
 
@@ -32,23 +44,23 @@ std::vector<price_t> test(std::vector<price_t> prices){
 enum data{ PLATES, PRICES, GALAXIES };
 int main() {
     data series = PLATES;
-    //Martin använder vektorer vid inläsning av data
-    std::vector<plate_t> plates = read_file<plate_t>("new_plates.txt");
+    std::vector<plate_t> plates = read_file<plate_t>("new_plates_half.txt");
+    //std::vector<price_t> prices = read_file<price_t>("ICA.txt");
+
     //Tar lång tid att lasta in
     //std::vector<galaxy_t> galaxies = read_file<galaxy_t>("JST.txt");
-
     Timer time;
     time.start();
 
 
     //------------------------------------- LÅT STÅ
     //-------------------------------------- TEST AV PLATES
-    //Testa om det tar snabbare med en array....
-
+    //STD::SORT ÄR 1.13732 s
     //std::future<std::vector<plate_t>> sorted_plates;
+   // mergeSort(plates, 0, plates.size() - 1);
     switch(series){
         case PLATES:
-            radix_sort<plate_t>(std::move(plates));
+            plates = radix_sort<plate_t>(std::move(plates));
             //sorted_plates = std::async(std::launch::async, radix_sort<plate_t>, std::move(plates));
             break;
         case PRICES:
@@ -60,10 +72,9 @@ int main() {
     //auto data = sorted_plates.get();
     time.stop();
     std::cout << time << std::endl;
-    //get_result(data, "result.txt");
+    get_result(plates, "result.txt");
 
     //sorted_plates.get();
-    //Använd for_each istället, snyggare...
     //-----------------------------------------------
 
 

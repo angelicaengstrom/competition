@@ -31,6 +31,7 @@ std::vector<T> counting_sort(std::vector<T> vec, const size_t& k, int count[], c
     return output;
 }
 
+//PLATE COUNT SORT
 template <>
 std::vector<plate_t> counting_sort<plate_t>(std::vector<plate_t> vec, const size_t& k, int count[], const int& n, const int& min){
     std::vector<plate_t> output(vec.size());
@@ -102,17 +103,47 @@ std::vector<plate_t> read_element(std::vector<plate_t> plates, size_t k){
     }
 }
 
+std::pair<std::vector<int>, int> count(std::vector<plate_t> vec, int k){
+    std::vector<int> count(256);
+    for(int i = 0; i < vec.size(); i++){
+        count[(int)vec[i][k] + 1]++;
+    }
+    for(int i = 1; i < 255; i++){
+        count[i] += count[i - 1];
+    }
+
+    return std::make_pair(count, k);
+}
+
 template <>
 std::vector<plate_t> radix_sort<plate_t>(std::vector<plate_t> vec){
     auto max = *std::max_element(vec.begin(), vec.end());
-
-    for(int i = (int)max.size() - 1; i >= 0; i--){
+    /*for(int i = (int)max.size() - 1; i >= 0; i--){
         vec = read_element(std::move(vec), i);
+    }*/
+
+
+    std::vector<std::future<std::pair<std::vector<int>, int>>> futures;
+    for(int i = (int)max.size() - 1; i >= 0; i--){
+        futures.push_back(std::async(std::launch::async, count, vec, i));
     }
-    return vec;
+    std::vector<std::pair<std::vector<int>, int>> counting_result;
+    for(auto& fur : futures){
+            counting_result.emplace_back(fur.get());
+    }
+    //Måste fixa sortering här......
+    std::vector<plate_t> output(vec.size());
+    for(auto k : counting_result){
+        for (int i = vec.size() - 1; i >= 0; i--) {
+            if(vec[i][k.second] > 0) {
+                output[k.first[(int) vec[i][k.second]] - 1] = vec[i];
+                k.first[(int) vec[i][k.second]]--;
+            }
+        }
+    }
+    return output;
 }
 
 
-//https://gist.github.com/brycelelbach/170f18d7a5d24f8389961d346acca853
 
 #endif //COMPETITION_RADIX_SORT_H
