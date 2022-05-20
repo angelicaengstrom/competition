@@ -9,6 +9,8 @@
 #include <future>
 #include "reader.h"
 #include "merge_sort.h"
+#include <execution>
+#include "trie.h"
 
 template<typename T>
 void get_result(std::vector<T> result, const std::string& filename = "result.txt"){
@@ -34,45 +36,51 @@ void get_result<price_t>(std::vector<price_t> result, const std::string& filenam
     }
 }
 
-std::vector<price_t> test(std::vector<price_t> prices){
-    std::transform(prices.begin(), prices.end(), prices.begin(), [](const price_t& price){ return price * 100; });
-    std::vector<price_t> result = radix_sort<price_t>(prices);
-    std::transform(result.begin(), result.end(), result.begin(), [](const price_t& price){ return price / 100; });
-    return result;
-}
-
-enum data{ PLATES, PRICES, GALAXIES };
 int main() {
-    data series = PLATES;
-    std::vector<plate_t> plates = read_file<plate_t>("new_plates_half.txt");
-    //std::vector<price_t> prices = read_file<price_t>("ICA.txt");
+    std::string filename = "new_plates.txt";
+    if ((fseek(stdin, 0, SEEK_END), ftell(stdin)) > 0){
+        data series = get_type(stdin);
+    }
+
+    data series = get_type(filename);
+    std::vector<plate_t> plates;
+    std::vector<price_t> prices;
+    std::vector<galaxy_t> galaxies;
+
+    Timer time;
 
     //Tar lång tid att lasta in
     //std::vector<galaxy_t> galaxies = read_file<galaxy_t>("JST.txt");
-    Timer time;
-    time.start();
-
 
     //------------------------------------- LÅT STÅ
     //-------------------------------------- TEST AV PLATES
     //STD::SORT ÄR 1.13732 s
-    //std::future<std::vector<plate_t>> sorted_plates;
+    //RADIX SORT MED ASYNC PÅ COUNTING ÄR 0.7 S
+    //RADIX SORT UTAN ASYNC ÄR 0.6S
    // mergeSort(plates, 0, plates.size() - 1);
     switch(series){
         case PLATES:
-            plates = radix_sort<plate_t>(std::move(plates));
-            //sorted_plates = std::async(std::launch::async, radix_sort<plate_t>, std::move(plates));
+            plates = read_file<plate_t>(filename);
+
+            time.start();
+            //radix_sort(plates);
+            parallel_radix_sort(plates);
+            //std::sort(std::execution::par_unseq, plates.begin(), plates.end());
+            //parallel_radix_sort(plates.begin(), plates.end());
             break;
         case PRICES:
+            prices = read_file<price_t>("ICA.txt");
+            time.start();
 
             break;
         case GALAXIES:
+            time.start();
+            std::sort(std::execution::par_unseq, plates.begin(), plates.end());
             break;
     }
-    //auto data = sorted_plates.get();
     time.stop();
     std::cout << time << std::endl;
-    get_result(plates, "result.txt");
+    //get_result(plates, "result.txt");
 
     //sorted_plates.get();
     //-----------------------------------------------
