@@ -64,12 +64,12 @@ std::vector<price_t> countingSort(std::vector<price_t> prices, int place) {
 }
 
 template <typename T>
-std::vector<T> radix_sort(std::vector<T> vec){
+std::vector<T> radix_sort(std::vector<T>& vec){
     return vec;
 }
 
 template <>
-std::vector<price_t> radix_sort<price_t>(std::vector<price_t> vec){
+std::vector<price_t> radix_sort<price_t>(std::vector<price_t>& vec){
     int max = (int)*std::max_element(vec.begin(), vec.end());
     for (int place = 1; max / place > 0; place *= 10) {
         vec = countingSort(vec, place);
@@ -77,174 +77,176 @@ std::vector<price_t> radix_sort<price_t>(std::vector<price_t> vec){
     return vec;
 }
 
-struct result{
-    result(std::vector<int> c, int m, int p):count(std::move(c)), min(m), pos(p){}
+//------------------------------------RADIX SORT PLATES
+void lsd_sort(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int n){
+    if(last <= first){ return; }
+
+    int min = ((*first)[n] >= '0' && (*first)[n] <= '9' ? (int) '0' : (int) 'A');
+
+    int count[27] = { 0 };
+
+    for (auto it = first; it != last; it++){
+        count[(*it)[n] - (int)min + 1]++;
+    }
+
+    for (int i = 1; i < 27; i++) {
+        count[i] += count[i - 1];
+    }
+
+    std::vector<plate_t> output(std::distance(first, last));
+
+    for (auto it = first; it != last; it++) {
+        output[count[(int)(*it)[n] - min]] = *(it);
+        count[(int)(*it)[n] - min]++;
+    }
+
+    for (int i = 0; first != last; first++) {
+        *first = output[i++];
+    }
+}
+
+template <>
+std::vector<plate_t> radix_sort<plate_t>(std::vector<plate_t>& vec){
+    auto max = *std::max_element(vec.begin(), vec.end());
+
+    for(int pos = max.size() - 1; pos >= 0; pos--) {
+        lsd_sort(vec.begin(), vec.end(), pos);
+    }
+
+    return vec;
+}
+
+
+//------------------------------------RADIX SORT ASYNC
+template <typename T>
+std::vector<T> async_radix_sort(std::vector<T>& vec){
+    return vec;
+}
+
+struct result_s{
+    result_s(std::vector<int> c, int m, int p):count(std::move(c)), min(m), pos(p){}
     std::vector<int> count;
     int min;
     int pos;
 };
 
+result_s radix_counter(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int8_t p){
+    int8_t limit, min;
 
-result radix_counter(std::vector<plate_t> vec, int k){
-    int limit, min;
-    if(vec[0][k] > '0' - 1 && vec[0][k] < '9' + 1){
+    if((*first)[p] >= '0' && (*first)[p] <= '9'){
         limit = 11;
-        min = (int)'0';
+        min = (int8_t)'0';
     }else{
         limit = 27;
-        min = (int)'A';
+        min = (int8_t)'A';
     }
 
     std::vector<int> count(limit);
-    for(int i = 0; i < vec.size(); i++){
-        count[(int)vec[i][k] + 1 - min]++;
+    for (auto it = first; it != last; it++){
+        count[(*it)[p] - (int8_t)min + 1]++;
     }
-    for(int i = 1; i < limit; i++){
+
+    for(int8_t i = 1; i < limit; i++){
         count[i] += count[i - 1];
     }
-    return result{count, min, k};
+
+    return result_s{count, min, p};
 }
 
 template <>
-std::vector<plate_t> radix_sort<plate_t>(std::vector<plate_t> vec){
-    auto max = *std::max_element(vec.begin(), vec.end());
-    std::vector<plate_t> output(vec.size());
-
-    for(int i = (int)max.size() - 1; i >= 0; i--){
-        auto r = radix_counter(vec, i);
-
-        for(int p = 0; p < vec.size(); p++) {
-            output[r.count[(int) vec[p][r.pos] - r.min]++] = vec[p];
-        }
-        std::copy(__pstl::execution::par, output.begin(), output.end(), vec.begin());
-        //vec = read_element(std::move(vec), i);
-    }
-    return vec;
-}
-
-template <typename T>
-std::vector<T> async_radix_sort(std::vector<T> vec){
-    return vec;
-}
-
-template <>
-std::vector<plate_t> async_radix_sort<plate_t>(std::vector<plate_t> vec){
+std::vector<plate_t> async_radix_sort<plate_t>(std::vector<plate_t>& vec){
     auto max = *std::max_element(vec.begin(), vec.end());
 
-    std::vector<std::future<result>> futures;
-    for(int i = (int)max.size() - 1; i >= 0; i--){
-        futures.push_back(std::async(std::launch::async, radix_counter, vec, i));
+    int8_t pos = max.size() - 1;
+
+    std::future<result_s> futures[max.size()];
+    for(int8_t i = 0; i < max.size(); i++){
+        futures[i] = std::async(std::launch::async, radix_counter, vec.begin(), vec.end(), pos--);
     }
-    std::vector<result> counting_result;
+
+    std::vector<result_s> counting_result;
     for(auto& fur : futures){
         counting_result.emplace_back(fur.get());
     }
-/*
+
     std::vector<plate_t> output(vec.size());
-    for(auto k : counting_result){
+    for(auto result : counting_result){
         for (int i = 0; i < vec.size(); i++) {
-            output[k.count[(int) vec[i][k.pos] - k.min]] = vec[i];
-            k.count[(int)vec[i][k.pos] - k.min]++;
+            output[result.count[(int8_t)vec[i][result.pos] - result.min]] = vec[i];
+            result.count[(int8_t)vec[i][result.pos] - result.min]++;
         }
         vec = output;
-    }*/
+    }
+
     return vec;
 }
 
 template <>
-std::vector<price_t> async_radix_sort<price_t>(std::vector<price_t> vec){
+std::vector<price_t> async_radix_sort<price_t>(std::vector<price_t>& vec){
     return vec;
+}
+
+
+//------------------------------------THREADED RADIX SORT
+void parallell_count(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int n, int min, int size){
+    int count[27] = { 0 };
+
+    for (auto it = first; it != last; it++){
+        count[(*it)[n] - (int)min + 1]++;
+    }
+
+    for (int i = 1; i < 27; i++) {
+        count[i] += count[i - 1];
+    }
+
+    std::vector<plate_t> output(size);
+
+    for (auto it = first; it != last; it++) {
+        output[count[(int)(*it)[n] - min]] = *(it);
+        count[(int)(*it)[n] - min]++;
+    }
+
+    for (int i = 0; first != last; first++) {
+        *first = output[i++];
+    }
+}
+
+void merge(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator middle, std::vector<plate_t>::iterator last, int pos){
+    std::inplace_merge(first, middle, last,
+                       [pos](const std::string &s1, const std::string &s2) { return s1[pos] < s2[pos]; });
+}
+
+void run_threads(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int pos){
+    int min = ((*first)[pos] >= '0' && (*first)[pos] <= '9' ? (int) '0' : (int) 'A');
+    auto n = std::distance(first, last) / MAX_THREAD;
+
+    std::thread threads[MAX_THREAD];
+    for(int i = 0; i < MAX_THREAD; i++){
+        threads[i] = std::thread(parallell_count, first + (i * n), first + ((i + 1) * n), pos, min, n);
+    }
+
+    for(auto& t : threads){
+        t.join();
+    }
+
+    std::thread t1 = std::thread(merge, first, first + n, first + (2 * n), pos);
+    std::thread t2 = std::thread(merge, first + (2 * n), first + (3 * n), last, pos);
+    t1.join();
+    t2.join();
+    std::thread t3 = std::thread(merge, first, first + (2 * n), last, pos);
+    t3.join();
 }
 
 template <typename T>
 void parallel_radix_sort(std::vector<T>& vec){
 }
 
-auto c(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator end, int k, int size){
-    int min;
-    if((*first)[k] > '0' - 1 && (*first)[k] < '9' + 1){
-        min = (int)'0';
-    }else{
-        min = (int)'A';
-    }
-
-    int histogram[27] = {0};
-    for (int i = 0; i < size; i++) {
-        histogram[(*(first + i))[k] - min + 1]++;
-    }
-
-    for (int i = 1; i < 27; i++) {
-        histogram[i] += histogram[i - 1];
-    }
-}
-
-
-std::vector<plate_t>::iterator parallell_count(std::vector<int>& count, std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int i, int min){
-    for (; first != last; first++){
-        count[(*first)[i] - min + 1]++;
-    }
-    return last;
-}
-
-std::vector<int> run_threads(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int i, int min){
-    auto n = std::distance(first, last) / MAX_THREAD;
-    std::vector<int> count(27);
-    std::vector<std::future<std::vector<plate_t>::iterator>> futures;
-
-    futures.push_back(std::async(parallell_count, std::ref(count), first, first + n, i, min));
-    futures.push_back(std::async( parallell_count, std::ref(count), first + n, first + 2*n, i, min));
-    futures.push_back(std::async(parallell_count, std::ref(count), first + 2*n, first + 3*n, i, min));
-    futures.push_back(std::async( parallell_count, std::ref(count), first + 3*n, last, i, min));
-
-    for(auto& f : futures){
-        f.get();
-    }
-    return count;
-    /*
-    threads.push_back(std::thread(parallell_count, std::ref(count), first, first + n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + n, first + 2*n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + 2*n, first + 3*n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + 3*n, last, i, min));
-
-    for(auto& t : threads){
-        t.join();
-    }*/
-
-    /*
-    std::vector<std::thread> threads;
-    threads.push_back(std::thread(parallell_count, std::ref(count), first, first + n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + n, first + 2*n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + 2*n, first + 3*n, i, min));
-    threads.push_back(std::thread(parallell_count, std::ref(count), first + 3*n, last, i, min));
-
-    for(auto& t : threads){
-        t.join();
-    }*/
-}
-
 template<>
 void parallel_radix_sort<plate_t>(std::vector<plate_t>& vec){
     auto max = *std::max_element(vec.begin(), vec.end());
 
-
-    for(int n = max.size() - 1; n >= 0; n--) {
-
-        int min = (vec[0][n] >= '0' && vec[0][n] <= '9' ? (int) '0' : (int) 'A');
-
-        std::vector<int> count = run_threads( vec.begin(), vec.end(), n, min);
-
-        for (int i = 1; i < 27; i++) {
-            count[i] += count[i - 1];
-        }
-
-        std::vector<plate_t> output(vec.size());
-/*
-        for (int i = 0; i < vec.size(); i++) {
-            output[count[(int)vec[i][n] - min]] = vec[i];
-            count[(int)vec[i][n] - min]++;
-        }*/
-        std::copy(output.begin(), output.end(), vec.begin());
-        //vec = output;
+    for(int n = max.size() - 1; n >= 0; n--){
+        run_threads( vec.begin(), vec.end(), n);
     }
 }
 

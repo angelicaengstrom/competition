@@ -5,6 +5,10 @@
 #ifndef COMPETITION_MERGE_SORT_H
 #define COMPETITION_MERGE_SORT_H
 
+#define sz 20
+#define thread_size 4
+int arr[sz];
+int temp_val = 0;
 
 // Merges two subarrays of array[].
 // First subarray is arr[begin..mid]
@@ -70,6 +74,55 @@ void mergeSort(std::vector<T>& array, int const begin, int const end)
     mergeSort(array, begin, mid);
     mergeSort(array, mid + 1, end);
     merge(array, begin, mid, end);
+}
+
+void combine_array(int first, int mid_val, int end){
+    int* start = new int[mid_val - first + 1];
+    int* last = new int[end - mid_val];
+    int temp_1 = mid_val - first + 1;
+    int temp_2 = end - mid_val;
+    int i, j;
+    int k = first;
+    for(i = 0; i < temp_1; i++){
+        start[i] = arr[i + first];
+    }
+    for (i = 0; i < temp_2; i++){
+        last[i] = arr[i + mid_val + 1];
+    }
+    i = j = 0;
+    while(i < temp_1 && j < temp_2){
+        if(start[i] <= last[j]){
+            arr[k++] = start[i++];
+        }
+        else{
+            arr[k++] = last[j++];
+        }
+    }
+    while (i < temp_1){
+        arr[k++] = start[i++];
+    }
+    while (j < temp_2){
+        arr[k++] = last[j++];
+    }
+}
+void Sorting_Threading(int first, int end){
+    int mid_val = first + (end - first) / 2;
+    if(first < end){
+        Sorting_Threading(first, mid_val);
+        Sorting_Threading(mid_val + 1, end);
+        combine_array(first, mid_val, end);
+    }
+}
+void* Sorting_Threading(void* arg){
+    int set_val = temp_val++;
+    int first = set_val * (sz / 4);
+    int end = (set_val + 1) * (sz / 4) - 1;
+    int mid_val = first + (end - first) / 2;
+    if (first < end){
+        Sorting_Threading(first, mid_val);
+        Sorting_Threading(mid_val + 1, end);
+        combine_array(first, mid_val, end);
+    }
 }
 
 #endif //COMPETITION_MERGE_SORT_H
