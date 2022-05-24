@@ -5,62 +5,40 @@
 #ifndef COMPETITION_RADIX_SORT_H
 #define COMPETITION_RADIX_SORT_H
 
+#define MAX_THREAD 4
 #include <algorithm>
 #include <future>
-#include <map>
-#include <thread>
-#define MAX_THREAD 4
+#include <valarray>
 
 using plate_t = std::string;
 using price_t = float;
 using galaxy_t = double;
-std::mutex mtx;
 
-template <typename T>
-std::vector<T> counting_sort(std::vector<T> vec, const size_t& k, int count[], const int& n, const int& min){
-    std::vector<T> output(vec.size());
 
-    for(int i = 0; i < vec.size(); i++){
-        count[vec[i][k] - min + 1]++;
+//------------------------------------RADIX SORT PRICES
+void lsd_sort(std::vector<price_t>::iterator first, std::vector<price_t>::iterator last, int n){
+    int factor = std::pow(10, 2);
+    size_t size = std::distance(first, last);
+
+    int count[10] = { 0 };
+    for (auto it = first; it != last; it++) {
+        count[int(((*it) * factor) / n) % 10]++;
     }
-    for(int i = 1; i < n; i++){
+
+    for (int i = 1; i < 10; i++) {
         count[i] += count[i - 1];
     }
 
-    for (int i = 0; i < vec.size(); i++) {
-        output[count[vec[i][k] - min]] = vec[i];
-        count[vec[i][k] - min]++;
+    std::vector<price_t> output(size);
+
+    for (auto it = last - 1; it != first - 1; it--) {
+        output[count[(int(((*it) * factor) / n) % 10)] - 1] = *it;
+        count[(int(((*it) * factor) / n) % 10)]--;
     }
 
-    return output;
-}
-
-std::vector<price_t> countingSort(std::vector<price_t> prices, int place) {
-    const int max = 10;
-    std::vector<price_t> output(prices.size());
-    int count[max];
-
-    for (int i = 0; i < max; ++i) {
-        count[i] = 0;
+    for (int i = 0; first != last; first++) {
+        *first = output[i++];
     }
-
-    // Calculate count of elements
-    for (int i = 0; i < prices.size(); i++) {
-        count[(int) (prices[i] / place) % 10]++;
-    }
-
-    // Calculate cumulative count
-    for (int i = 1; i < max; i++) {
-        count[i] += count[i - 1];
-    }
-
-    // Place the elements in sorted order
-    for (int i = prices.size() - 1; i >= 0; i--) {
-        output[count[(int)(prices[i] / place) % 10] - 1] = prices[i];
-        count[(int)(prices[i] / place) % 10]--;
-    }
-
-    return output;
 }
 
 template <typename T>
@@ -70,10 +48,12 @@ std::vector<T> radix_sort(std::vector<T>& vec){
 
 template <>
 std::vector<price_t> radix_sort<price_t>(std::vector<price_t>& vec){
-    int max = (int)*std::max_element(vec.begin(), vec.end());
-    for (int place = 1; max / place > 0; place *= 10) {
-        vec = countingSort(vec, place);
+    price_t max = (price_t)*std::max_element(vec.begin(), vec.end());
+
+    for (int p = 1; (int)(max * 100/ p) > 0; p *= 10) {
+        lsd_sort(vec.begin(), vec.end(), p);
     }
+
     return vec;
 }
 
@@ -96,7 +76,7 @@ void lsd_sort(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterat
     std::vector<plate_t> output(std::distance(first, last));
 
     for (auto it = first; it != last; it++) {
-        output[count[(int)(*it)[n] - min]] = *(it);
+        output[count[(int)(*it)[n] - min]] = *it;
         count[(int)(*it)[n] - min]++;
     }
 
@@ -117,77 +97,92 @@ std::vector<plate_t> radix_sort<plate_t>(std::vector<plate_t>& vec){
 }
 
 
-//------------------------------------RADIX SORT ASYNC
+//-----------------------------ASYNCHRONOUS RADIX SORT
+std::pair<std::vector<int>, int> async_counter(std::vector<plate_t>& vec, int k){
+    std::vector<int> count(255);
+    for(int i = 0; i < vec.size(); i++){
+        count[(int)vec[i][k]]++;
+    }
+    for(int i = 0; i < 254; i++){
+        count[i + 1] += count[i];
+    }
+    return std::make_pair(count, k);
+}
+
 template <typename T>
 std::vector<T> async_radix_sort(std::vector<T>& vec){
     return vec;
-}
-
-struct result_s{
-    result_s(std::vector<int> c, int m, int p):count(std::move(c)), min(m), pos(p){}
-    std::vector<int> count;
-    int min;
-    int pos;
-};
-
-result_s radix_counter(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int8_t p){
-    int8_t limit, min;
-
-    if((*first)[p] >= '0' && (*first)[p] <= '9'){
-        limit = 11;
-        min = (int8_t)'0';
-    }else{
-        limit = 27;
-        min = (int8_t)'A';
-    }
-
-    std::vector<int> count(limit);
-    for (auto it = first; it != last; it++){
-        count[(*it)[p] - (int8_t)min + 1]++;
-    }
-
-    for(int8_t i = 1; i < limit; i++){
-        count[i] += count[i - 1];
-    }
-
-    return result_s{count, min, p};
 }
 
 template <>
 std::vector<plate_t> async_radix_sort<plate_t>(std::vector<plate_t>& vec){
     auto max = *std::max_element(vec.begin(), vec.end());
 
-    int8_t pos = max.size() - 1;
-
-    std::future<result_s> futures[max.size()];
-    for(int8_t i = 0; i < max.size(); i++){
-        futures[i] = std::async(std::launch::async, radix_counter, vec.begin(), vec.end(), pos--);
+    std::vector<std::future<std::pair<std::vector<int>, int>>> futures;
+    for(int8_t i = (int)max.size() - 1; i >= 0; i--){
+        futures.push_back(std::async(std::launch::async, async_counter, std::ref(vec), i));
     }
 
-    std::vector<result_s> counting_result;
+    std::vector<std::pair<std::vector<int>, int>> counting_result;
     for(auto& fur : futures){
-        counting_result.emplace_back(fur.get());
+        counting_result.push_back(fur.get());
     }
 
     std::vector<plate_t> output(vec.size());
-    for(auto result : counting_result){
-        for (int i = 0; i < vec.size(); i++) {
-            output[result.count[(int8_t)vec[i][result.pos] - result.min]] = vec[i];
-            result.count[(int8_t)vec[i][result.pos] - result.min]++;
+    for(auto k : counting_result){
+        for(int i = vec.size() - 1; i >= 0; i--) {
+            output[k.first[(int) vec[i][k.second]] - 1] = vec[i];
+            k.first[(int)vec[i][k.second]]--;
         }
-        vec = output;
+        std::copy(output.begin(), output.end(), vec.begin());
+    }
+    return vec;
+}
+
+//------------------------------------ASYNC RADIX SORT PRICES
+std::pair<std::vector<int>, int> async_price_counter(std::vector<price_t>::iterator first,
+                                                     std::vector<price_t>::iterator last, int k){
+    int factor = std::pow(10, 2);
+
+    std::vector<int> count(10);
+    for (auto it = first; it != last; it++) {
+        count[int(((*it) * factor) / k) % 10]++;
     }
 
-    return vec;
+    for (int i = 1; i < 10; i++) {
+        count[i] += count[i - 1];
+    }
+    return std::make_pair(count, k);
 }
 
 template <>
 std::vector<price_t> async_radix_sort<price_t>(std::vector<price_t>& vec){
+    auto max = *std::max_element(vec.begin(), vec.end());
+
+    std::vector<std::future<std::pair<std::vector<int>, int>>> futures;
+    for(int p = 1; (int)(max * 100/ p) > 0; p *= 10){
+        futures.push_back(std::async(std::launch::async, async_price_counter, vec.begin(), vec.end(), p));
+    }
+
+    std::vector<std::pair<std::vector<int>, int>> counting_result;
+    for(auto& fur : futures){
+        counting_result.push_back(fur.get());
+    }
+
+    auto factor = std::pow(10,2);
+    std::vector<price_t> output(vec.size());
+
+    for(auto k : counting_result){
+        for (auto it = vec.end() - 1; it != vec.begin() - 1; it--) {
+            output[k.first[(int(((*it) * factor) / k.second) % 10)] - 1] = *it;
+            k.first[(int(((*it) * factor) / k.second) % 10)]--;
+        }
+     //   std::copy(output.begin(), output.end(), vec.begin());
+    }
     return vec;
 }
 
-
-//------------------------------------THREADED RADIX SORT
+//-----------------------------THREADED RADIX SORT
 void parallell_count(std::vector<plate_t>::iterator first, std::vector<plate_t>::iterator last, int n, int min, int size){
     int count[27] = { 0 };
 
@@ -237,7 +232,7 @@ void run_threads(std::vector<plate_t>::iterator first, std::vector<plate_t>::ite
     t3.join();
 }
 
-template <typename T>
+template<typename T>
 void parallel_radix_sort(std::vector<T>& vec){
 }
 
@@ -249,6 +244,5 @@ void parallel_radix_sort<plate_t>(std::vector<plate_t>& vec){
         run_threads( vec.begin(), vec.end(), n);
     }
 }
-
 
 #endif //COMPETITION_RADIX_SORT_H

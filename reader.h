@@ -5,15 +5,9 @@
 #ifndef COMPETITION_READER_H
 #define COMPETITION_READER_H
 
-#include <any>
-
-using plate_t = std::string;
-using galaxy_t = double;
-using price_t = float;
-
 template<typename T>
 std::vector<T> read_file(const std::string& filename){
-    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\Skola\Data\sortcomp\text\)" + filename);
+    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
     std::vector<T> buffer;
     T element;
     while(file >> element){
@@ -25,32 +19,47 @@ std::vector<T> read_file(const std::string& filename){
 
 template <>
 std::vector<price_t> read_file<price_t>(const std::string& filename){
-    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\Skola\Data\sortcomp\text\)" + filename);
+    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
     std::vector<price_t> buffer;
     std::string element;
     while(file >> element){
         if(element != "kr") {
-            buffer.push_back(std::stof(element));
+            buffer.push_back(std::stod(element));
         }
     }
     file.close();
     return buffer;
 }
-/*
-template <> std::vector<galaxy_t> read_file<galaxy_t>(const std::string& filename){
-    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
-    std::vector<galaxy_t> buffer;
-    galaxy_t element;
-    while(file >> element){
+
+template<typename T>
+std::vector<T> read_file(FILE *__stream){
+    rewind(__stream);
+    std::vector<T> buffer;
+    T element;
+    while(std::cin >> element){
         buffer.push_back(element);
     }
-    file.close();
+    fclose(__stream);
     return buffer;
-}*/
+}
+
+template <>
+std::vector<price_t> read_file<price_t>(FILE *__stream){
+    rewind(__stream);
+    std::vector<price_t> buffer;
+    std::string element;
+    while(std::cin >> element){
+        if(element != "kr") {
+            buffer.push_back(std::stod(element));
+        }
+    }
+    fclose(__stream);
+    return buffer;
+}
 
 enum data{PLATES, PRICES, GALAXIES, NONE};
 enum::data get_type(const std::string& filename){
-    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\Skola\Data\sortcomp\text\)" + filename);
+    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
     file >> std::ws;
     int c = file.peek();
 
@@ -95,6 +104,16 @@ enum::data get_type(FILE *__stream){
     }
 }
 
-
+/*
+template <> std::vector<galaxy_t> read_file<galaxy_t>(const std::string& filename){
+    std::ifstream file(R"(C:\Users\angel\OneDrive\Dokument\DT046G Datastrukturer och Algoritmer\Competition\test\)" + filename);
+    std::vector<galaxy_t> buffer;
+    galaxy_t element;
+    while(file >> element){
+        buffer.push_back(element);
+    }
+    file.close();
+    return buffer;
+}*/
 
 #endif //COMPETITION_READER_H
